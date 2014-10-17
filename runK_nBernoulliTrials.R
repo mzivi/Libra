@@ -16,18 +16,22 @@ CalcPLongestRunLessEqual1 <- function(p, k, n) {
   if (k < 0)
     stop("k < 0")
   
+  # state tracks the probabilities for each n: state[n+1] = P[k|n]
   state <- array(NA, n+1)
-  state[1:min(k+1, n+1)] <- 1
+  state[1:min(k+1, n+1)] <- 1 # don't need to calculate for n <= k
+  
   CalcPLongestRunLessEqualImpl1(p, k, n, state)
 }
 
 CalcPLongestRunLessEqualImpl1 <- function(p, k, n, state) {
 
-  if (n <= k)
+  if (n <= k) # we have alerady dealt with these during initialization
     return (state)
   
   pkn <- state[n+1]
-  if (is.na(pkn)) {
+  if (is.na(pkn)) { # it's a first timer!
+    
+    # this will update state up to n-1
     state <- CalcPLongestRunLessEqualImpl1(p, k, n - 1, state)
     pkn = 0
     for (j in 0:min(k, n-1)) {
@@ -64,9 +68,9 @@ CalcPLongestRunLessEqual2 = function(p, k, n) {
   
   result <- rep(NA, n+1)
   A <- cbind(rbind(rep(1-p, k+1), p * diag(k+1)), c(rep(0, k+1), 1))
-  s <- c(1, rep(0, k+1))
+  s <- c(1, rep(0, k+1)) # initial state, k = 0
   result[1] <- 1 # n = 0
-  if (n>0) {
+  if (n > 0) {
     for (j in 1:n) {
       s <- A %*% s
       result[j+1] <- 1-s[k+2]
@@ -111,8 +115,10 @@ head(Prob[Prob$k==1, ])
 head(Prob[Prob$n==2, ])
 head(Prob[Prob$n==3, ])
 
-if (require(ggplot2)) {
-  p = ggplot(data = Prob, aes(x=n, y=P, group=k, colour=factor(k))) +
-    theme_bw() + ggtitle("P[ln > k| n") + xlab("n") + geom_line() + geom_point()
-  plot(p)
+if (!require(ggplot2)) {
+  stop("Please install ggplot2 package in order to continue.")
 }
+
+p = ggplot(data = Prob, aes(x=n, y=P, group=k, colour=factor(k))) +
+  theme_bw() + ggtitle("P[ln > k| n") + xlab("n") + geom_line() + geom_point()
+plot(p)
