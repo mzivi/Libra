@@ -1,3 +1,6 @@
+require(reshape2)
+require(ggplot2)
+
 # Estimation of P[ln > k|n] where ln is the length of the longest run
 # of successes in n Bernoulli trials.
 #
@@ -96,17 +99,16 @@ sum(result1-result2)
 # We now want to calculate P[ln>k|n], which is just 1 - P[k|n]
 # as defined above.
 
-Prob <- matrix(NA, 11, 51)
-for (k in 0:10) {
-  Prob[k+1,] <- 1-CalcPLongestRunLessEqual2(0.5, k, 50)
+kmax <- 10
+n <- 10
+p <- 0.5
+
+Prob <- matrix(NA, kmax + 1, n + 1)
+for (k in 0:kmax) {
+  Prob[k+1,] <- 1-CalcPLongestRunLessEqual2(p, k, n)
 }
 rownames(Prob) <- 0:(nrow(Prob)-1)
 colnames(Prob) <- 0:(ncol(Prob)-1)
-
-if (!require(reshape2)) {
-  head(Prob)
-  stop("Please install reshape2 package in order to continue.")
-}
 
 Prob <- melt(Prob)
 colnames(Prob) <- c("k", "n", "P")
@@ -115,10 +117,63 @@ head(Prob[Prob$k==1, ])
 head(Prob[Prob$n==2, ])
 head(Prob[Prob$n==3, ])
 
-if (!require(ggplot2)) {
-  stop("Please install ggplot2 package in order to continue.")
+ggplot(data = Prob, aes(x=n, y=P, group=k, colour=factor(k))) +
+  theme_bw() + ggtitle("P[ln > k| n") + xlab("n") + geom_line() + geom_point()
+
+
+# let's tackle P[ln = k|n]
+# just use approach 2 above, but when there has been a run of length k
+# if next trial is tail jump into a second set of states which counts
+# again the run length to make sure there is not going to be a longer one.
+# state s = (s_a, s_b, T)
+# s_a[k+1] = prob length of last run equals k conditional on there hasn't
+# been a run of length k or more
+# s_b[k=1] = prob length of last run equals k conditional on there has
+# been a run of length k but not more.
+# T = there has been a run of length more than k
+CalcPLongestRunEqualK = function(p, k, n) {
+  if (n < 0)
+    stop("n < 0")
+  if (k < 0)
+    stop("k < 0")
+  if (k == 0)
+    return (rep(1 - p, n + 1)^(0:n))
+  
+  result <- rep(NA, n + 1)
+  Aa <- rbind(rep(1 - p, k), cbind(p * diag(k - 1), rep(0, k - 1)))
+  A.b.a <- matrix(0, k, k + 2) # from b no way to get back to a
+  A.a.b <- matrix(0, k + 2, k)
+  A.a.b[k + 1, k] <- p # only way from a -> b, first run reaches length k
+  Ab <- cbind(rbind(rep(1 - p, k+1), p * diag(k+1)), c(rep(0, k+1), 1))
+  A <- rbind(cbind(Aa, A.b.a), cbind(A.a.b, Ab))
+
+  s <- c(1, rep(0, 2 * k + 1)) # initial state, k = 0
+  result[1] <- ifelse(k == 0, 1, 0) # n = 0
+  if (n > 0) {
+    for (j in 1:n) {
+      s <- A %*% s
+      result[j+1] <- sum(s[(k + 1):(nrow(A) - 1)])
+    }
+  }
+  result
 }
 
-p = ggplot(data = Prob, aes(x=n, y=P, group=k, colour=factor(k))) +
-  theme_bw() + ggtitle("P[ln > k| n") + xlab("n") + geom_line() + geom_point()
-plot(p)
+kmax <- 10
+n <- 100
+p <- 0.5
+Prob <- matrix(NA, kmax + 1, n + 1)
+for (k in 0:kmax) {
+  Prob[k+1,] <- CalcPLongestRunEqualK(p, k, n)
+}
+rownames(Prob) <- 0:(nrow(Prob)-1)
+colnames(Prob) <- 0:(ncol(Prob)-1)
+
+Prob <- melt(Prob)
+colnames(Prob) <- c("k", "n", "P")
+head(Prob[Prob$k==0, ])
+head(Prob[Prob$k==1, ])
+head(Prob[Prob$n==2, ])
+head(Prob[Prob$n==3, ])
+
+ggplot(data = Prob, aes(x=n, y=P, group=k, colour=factor(k))) +
+  theme_bw() + ggtitle("P[ln = k| n") + xlab("n") + geom_line() + geom_point()
