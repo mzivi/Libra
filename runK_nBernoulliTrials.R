@@ -158,6 +158,49 @@ CalcPLongestRunEqualK = function(p, k, n) {
   result
 }
 
+CalcPLongestRunEqualKNaive = function(p, k, n) {
+  if (n < 0)
+    stop("n < 0")
+  if (k < 0)
+    stop("k < 0")
+  if (k == 0)
+    return (rep(1 - p, n + 1)^(0:n))
+  if (n == 0)
+    return (c(0))
+  
+  result <- rep(NA, n + 1)
+  result[1] <- 0
+  # init for n == 1
+  for (i in 1:n) {
+    if (i == 1) {
+      all.sequences <- matrix(c(0, 1), 2, 1)
+    } else {
+      all.sequences <- rbind(cbind(rep(0, nrow(all.sequences)), all.sequences),
+                             cbind(rep(1, nrow(all.sequences)), all.sequences))
+    }
+    n.k.max <- 0
+    for (j in 1:nrow(all.sequences)) {
+      max.last.length <- 0
+      max.length <- 0
+      for (l in 1:i) {
+        if (all.sequences[j, l] == 1) {
+          max.last.length = max.last.length + 1
+          if (max.last.length > max.length)
+            max.length <- max.last.length
+        } else {
+          max.last.length <- 0
+        }
+      }
+      if (max.length == k)
+        n.k.max <- n.k.max + 1
+    }
+    result[i + 1] <- n.k.max / nrow(all.sequences)
+  }
+
+  result
+}
+
+
 kmax <- 10
 n <- 100
 p <- 0.5
@@ -167,6 +210,25 @@ for (k in 0:kmax) {
 }
 rownames(Prob) <- 0:(nrow(Prob)-1)
 colnames(Prob) <- 0:(ncol(Prob)-1)
+
+
+# let's check a few...
+kmax <- 10
+n <- 20
+p <- 0.5
+ProbNaive <- matrix(NA, kmax + 1, n + 1)
+for (k in 0:kmax) {
+  ProbNaive[k+1,] <- CalcPLongestRunEqualKNaive(p, k, n)
+}
+rownames(ProbNaive) <- 0:(nrow(ProbNaive)-1)
+colnames(ProbNaive) <- 0:(ncol(ProbNaive)-1)
+
+# they should be exactly the same
+sum(ProbNaive - Prob[1:nrow(ProbNaive), 1:ncol(ProbNaive)] )
+
+# but the Markov Chain is clearly much faster
+system.time(result1 <- CalcPLongestRunEqualK(0.5, 1, 18))
+system.time(result2 <- CalcPLongestRunEqualKNaive(0.5, 1, 18))
 
 Prob <- melt(Prob)
 colnames(Prob) <- c("k", "n", "P")
